@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../models/user_model.dart';
 import '../services/database_helper.dart';
+import '../services/github_service.dart'; // Importe o serviço
 import '../widgets/glass_widgets.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -33,20 +34,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _saveProfile() async {
     setState(() => _isLoading = true);
 
-    // Cria um novo objeto usuário com o github atualizado
+    final String githubUser = _githubController.text.trim();
+    String? avatarUrl = widget.user.githubAvatarUrl;
+
+    // Se o usuário mudou o GitHub ou não tem avatar, busca na API
+    if (githubUser.isNotEmpty && (githubUser != widget.user.githubUsername || avatarUrl == null)) {
+      avatarUrl = await GitHubService.fetchAvatarUrl(githubUser);
+    } else if (githubUser.isEmpty) {
+      avatarUrl = null; // Remove avatar se limpar o campo
+    }
+
     final updatedUser = widget.user.copyWith(
-      githubUsername: _githubController.text.trim().isEmpty ? null : _githubController.text.trim(),
+      githubUsername: githubUser.isEmpty ? null : githubUser,
+      githubAvatarUrl: avatarUrl,
     );
 
-    // Salva no banco
     await DatabaseHelper.instance.updateUser(updatedUser);
     
-    // Notifica a HomePage que o usuário mudou
     widget.onUserUpdated(updatedUser);
 
     if (mounted) {
       setState(() => _isLoading = false);
-      Navigator.pop(context); // Fecha o perfil
+      Navigator.pop(context); 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Perfil atualizado!")),
       );
@@ -55,11 +64,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Widget da Imagem de Perfil
+    Widget profileImage;
+    if (widget.user.githubAvatarUrl != null) {
+      profileImage = ClipOval(
+        child: Image.network(
+          widget.user.githubAvatarUrl!,
+          width: 100,
+          height: 100,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => const Icon(Icons.person, size: 50, color: Colors.white),
+        ),
+      );
+    } else {
+      profileImage = const Icon(Icons.person, size: 50, color: Colors.white);
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFF0B0B0E),
       body: Stack(
         children: [
-          // Fundo Ambiente
           Positioned(
              top: -50,
              right: -50,
@@ -78,7 +102,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           SafeArea(
             child: Column(
               children: [
-                // Header
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: Row(
@@ -94,7 +117,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                 const SizedBox(height: 20),
 
-                // Avatar
+                // Avatar Container
                 Container(
                   width: 100,
                   height: 100,
@@ -103,7 +126,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     border: Border.all(color: const Color(0xFF30D158), width: 2),
                     color: Colors.white.withOpacity(0.05),
                   ),
-                  child: const Icon(Icons.person, size: 50, color: Colors.white),
+                  child: profileImage,
                 ),
                 const SizedBox(height: 16),
                 Text(widget.user.username, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
@@ -111,7 +134,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                 const SizedBox(height: 40),
 
-                // Formulário GitHub
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24.0),
                   child: GlassHabitContainer(
@@ -127,7 +149,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         const SizedBox(height: 15),
                         const Text(
-                          "Conecte seu GitHub para ver suas contribuições como um hábito.",
+                          "Conecte seu GitHub para ver suas contribuições e foto de perfil.",
                           style: TextStyle(fontSize: 12, color: Colors.white54),
                         ),
                         const SizedBox(height: 15),
@@ -166,7 +188,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                 const Spacer(),
 
-                // Logout Button (Moved to Bottom)
                 Padding(
                   padding: const EdgeInsets.all(24.0),
                   child: GestureDetector(

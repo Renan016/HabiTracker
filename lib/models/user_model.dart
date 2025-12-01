@@ -3,7 +3,8 @@ class User {
   final String username;
   final String email;
   final String password;
-  final String? githubUsername; // Novo campo opcional
+  final String? githubUsername;
+  final String? githubAvatarUrl; // NOVO CAMPO
 
   User({
     required this.id,
@@ -11,6 +12,7 @@ class User {
     required this.email,
     required this.password,
     this.githubUsername,
+    this.githubAvatarUrl,
   });
 
   Map<String, dynamic> toMap() {
@@ -19,7 +21,8 @@ class User {
       'username': username,
       'email': email,
       'password': password,
-      'github_username': githubUsername, // Mapeando para o banco
+      'github_username': githubUsername,
+      'github_avatar_url': githubAvatarUrl, // Mapeia para o banco
     };
   }
 
@@ -30,17 +33,18 @@ class User {
       email: map['email'],
       password: map['password'],
       githubUsername: map['github_username'],
+      githubAvatarUrl: map['github_avatar_url'],
     );
   }
   
-  // Método auxiliar para criar uma cópia do usuário com dados novos
-  User copyWith({String? githubUsername}) {
+  User copyWith({String? githubUsername, String? githubAvatarUrl}) {
     return User(
       id: id,
       username: username,
       email: email,
       password: password,
       githubUsername: githubUsername ?? this.githubUsername,
+      githubAvatarUrl: githubAvatarUrl ?? this.githubAvatarUrl,
     );
   }
 }

@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import '../models/habit.dart';
 import '../models/user_model.dart';
 import '../services/database_helper.dart';
-import '../services/github_service.dart'; // Importe o serviço
+import '../services/github_service.dart';
 import '../widgets/glass_widgets.dart';
 import 'auth_screen.dart';
 import 'add_habit_screen.dart';
-import 'profile_screen.dart'; // Importe a tela de perfil
+import 'profile_screen.dart';
 
 enum ViewMode { day, weekly, overall }
 
@@ -39,34 +39,29 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  // Atualiza o usuário na memória quando volta da tela de perfil
   void _updateUser(User updatedUser) {
     setState(() {
       _currentUser = updatedUser;
     });
-    _refreshHabits(); // Recarrega hábitos (incluindo o do GitHub se foi adicionado)
+    _refreshHabits();
   }
 
   Future<void> _refreshHabits() async {
     if (_currentUser != null) {
-      // 1. Busca hábitos normais do SQLite
       List<Habit> data = await DatabaseHelper.instance.readHabits(_currentUser!.id);
 
-      // 2. Busca dados do GitHub se o usuário tiver configurado
       if (_currentUser!.githubUsername != null && _currentUser!.githubUsername!.isNotEmpty) {
         try {
           final githubDates = await GitHubService.fetchContributions(_currentUser!.githubUsername!);
           
-          // Cria um hábito "Virtual" (não salvo no banco habits, apenas visualização)
           final githubHabit = Habit(
-            id: 'github_virtual_habit', // ID fixo para identificar
+            id: 'github_virtual_habit',
             title: 'GitHub Contributions',
             emoji: '🐙',
             userId: _currentUser!.id,
             completedDays: githubDates,
           );
 
-          // Adiciona no topo da lista
           data.insert(0, githubHabit);
         } catch (e) {
           print("Erro ao carregar GitHub: $e");
@@ -90,7 +85,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _toggleHabitForDate(Habit habit, DateTime date) async {
-    // Impede marcar manualmente o hábito do GitHub
     if (habit.id == 'github_virtual_habit') {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("O hábito do GitHub é atualizado automaticamente!")),
@@ -108,7 +102,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _showDeleteConfirmationDialog(Habit habit) {
-    // Impede deletar o hábito do GitHub
     if (habit.id == 'github_virtual_habit') return;
 
     showDialog(
@@ -167,8 +160,8 @@ class _HomePageState extends State<HomePage> {
                         ],
                       ),
                       
-                      GlassIconButton(
-                        icon: Icons.person, 
+                      // --- BOTÃO DE PERFIL COM AVATAR ---
+                      GestureDetector(
                         onTap: () {
                           Navigator.push(
                             context,
@@ -178,8 +171,34 @@ class _HomePageState extends State<HomePage> {
                               onLogout: _logout,
                             )),
                           );
-                        }
+                        },
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(40),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                            child: Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(40),
+                                border: Border.all(color: Colors.white.withOpacity(0.18)),
+                              ),
+                              child: _currentUser!.githubAvatarUrl != null
+                                  ? ClipOval(
+                                      child: Image.network(
+                                        _currentUser!.githubAvatarUrl!,
+                                        fit: BoxFit.cover,
+                                        width: 42,
+                                        height: 42,
+                                      ),
+                                    )
+                                  : Icon(Icons.person, size: 22, color: Colors.white.withOpacity(0.85)),
+                            ),
+                          ),
+                        ),
                       ),
+                      // ----------------------------------
                     ],
                   ),
                 ),
@@ -276,27 +295,30 @@ class _HomePageState extends State<HomePage> {
         );
       
       case ViewMode.overall:
-        // AJUSTE: Aumentei para 24 semanas para preencher a tela inteira
-        const int weeksToShow = 24; 
-        const int totalDays = weeksToShow * 7;
+        // AJUSTE: Grid preenchido para largura típica de smartphone (17 semanas)
+        const int weeksToShow = 17; 
+        const int totalDays = weeksToShow * 7; 
 
         return Align(
           alignment: Alignment.centerRight,
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            reverse: true, 
+            reverse: true, // Começa do "hoje" (direita)
             child: Row(
+              // Gera as colunas (Semanas)
               children: List.generate(weeksToShow, (colIndex) {
-                // Cada coluna representa uma semana
                 return Container(
                   margin: const EdgeInsets.only(right: 4),
                   child: Column(
+                    // Gera as linhas (Dias da semana)
                     children: List.generate(7, (rowIndex) {
-                      // Calcula o índice do dia (0 a totalDays-1)
-                      final int itemIndex = (colIndex * 7) + rowIndex;
                       
-                      // Ajuste do cálculo: (totalDays - 1) garante que o último índice seja 0 dias atrás (hoje)
-                      final date = DateTime.now().subtract(Duration(days: (totalDays - 1) - itemIndex));
+                      final int colReverseIndex = (weeksToShow - 1) - colIndex; // Inverte para contar de trás pra frente
+                      final int rowReverseIndex = 6 - rowIndex; // Inverte para contar de baixo pra cima
+                      
+                      final int daysAgo = (colReverseIndex * 7) + rowReverseIndex;
+                      
+                      final date = DateTime.now().subtract(Duration(days: daysAgo));
                       final isDone = habit.isCompletedOn(date);
                       
                       return Container(

@@ -11,8 +11,8 @@ class DatabaseHelper {
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    // Alterei para v3 para garantir que a nova estrutura seja criada
-    _database = await _initDB('habitracker_v3.db'); 
+    // Bump para v4 para recriar tabela com nova coluna
+    _database = await _initDB('habitracker_v4.db'); 
     return _database!;
   }
 
@@ -30,18 +30,18 @@ class DatabaseHelper {
   }
 
   Future _createDB(Database db, int version) async {
-    // 1. Tabela de Usuários (Com github_username)
+    // Adicionada coluna github_avatar_url
     await db.execute('''
       CREATE TABLE users (
         id TEXT PRIMARY KEY,
         username TEXT NOT NULL,
         email TEXT NOT NULL UNIQUE,
         password TEXT NOT NULL,
-        github_username TEXT
+        github_username TEXT,
+        github_avatar_url TEXT
       )
     ''');
 
-    // 2. Tabela de Hábitos
     await db.execute('''
       CREATE TABLE habits (
         id TEXT PRIMARY KEY,
@@ -81,7 +81,6 @@ class DatabaseHelper {
     return null;
   }
 
-  // Novo método para atualizar dados do usuário (ex: vincular github)
   Future<void> updateUser(User user) async {
     final db = await instance.database;
     await db.update(
